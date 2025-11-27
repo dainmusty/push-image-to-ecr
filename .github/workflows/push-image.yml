@@ -1,0 +1,62 @@
+name: Push image to ECR (Retag)
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  IMAGE_NAME: effulgencetech-nodejs-img
+  IMAGE_TAG: latest
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_PASSWORD }}
+  AWS_ROLE_NAME: ECRPush-Dev-Role
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load credentials from SSM
+        id: creds
+        run: |
+          USER_PARAM=$(aws ssm get-parameter \
+            --name "${{ secrets.DOCKERHUB_USERNAME }}" \
+            --with-decryption \
+            --query "Parameter.Value" \
+            --output text)
+
+          PASS_PARAM=$(aws ssm get-parameter \
+            --name "${{ secrets.DOCKERHUB_PASSWORD }}" \
+            --with-decryption \
+            --query "Parameter.Value" \
+            --output text)
+
+          echo "USER=$USER_PARAM" >> $GITHUB_ENV
+          echo "PASS=$PASS_PARAM" >> $GITHUB_ENV
+
+      - name: Login to DockerHub
+        run: echo "$PASS" | docker login -u "$USER" --password-stdin
+
+      - name: Pull image from DockerHub
+        run: docker pull $DOCKERHUB_USER/$IMAGE_NAME:$IMAGE_TAG
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.AWS_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        run: aws ecr get-login-password --region $AWS_REGION \
+              | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Tag image for ECR
+        run: docker tag $DOCKERHUB_USER/$IMAGE_NAME:$IMAGE_TAG \
+                   $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$IMAGE_TAG
+
+      - name: Push to ECR
+        run: docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$IMAGE_TAG
