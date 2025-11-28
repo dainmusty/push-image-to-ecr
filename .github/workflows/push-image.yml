@@ -12,6 +12,13 @@ env:
   DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_PASSWORD }}
   AWS_ROLE_NAME: ECRPush-Dev-Role
 
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  packages: write  
+
 jobs:
   retag:
     runs-on: ubuntu-latest
