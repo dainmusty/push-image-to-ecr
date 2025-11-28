@@ -17,29 +17,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Load credentials from SSM
-        id: creds
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.AWS_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-ecr-session
+
+      - name: Load DockerHub credentials from SSM
         run: |
           USER_PARAM=$(aws ssm get-parameter \
-            --name "${{ secrets.DOCKERHUB_USERNAME }}" \
+            --name "/github/dockerhub/username" \
             --with-decryption \
             --query "Parameter.Value" \
             --output text)
 
           PASS_PARAM=$(aws ssm get-parameter \
-            --name "${{ secrets.DOCKERHUB_PASSWORD }}" \
+            --name "/github/dockerhub/password" \
             --with-decryption \
             --query "Parameter.Value" \
             --output text)
 
-          echo "USER=$USER_PARAM" >> $GITHUB_ENV
-          echo "PASS=$PASS_PARAM" >> $GITHUB_ENV
+          echo "DOCKERHUB_USER=$USER_PARAM" >> $GITHUB_ENV
+          echo "DOCKERHUB_PASS=$PASS_PARAM" >> $GITHUB_ENV
 
       - name: Login to DockerHub
-        run: echo "$PASS" | docker login -u "$USER" --password-stdin
+        run: echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
       - name: Pull image from DockerHub
         run: docker pull $DOCKERHUB_USER/$IMAGE_NAME:$IMAGE_TAG
