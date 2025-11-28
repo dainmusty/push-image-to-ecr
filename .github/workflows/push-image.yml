@@ -57,7 +57,7 @@ jobs:
         run: echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
       - name: Pull image from DockerHub
-        run: docker pull $DOCKERHUB_USER/$IMAGE_NAME:$IMAGE_TAG
+        run: docker pull $DOCKERHUB_USER/$IMAGE_NAME:$SOURCE_TAG
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
